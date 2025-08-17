@@ -1,0 +1,14 @@
+{
+  "prompt": {
+    "reviewerRole": null,
+    "reviewCriteria": null,
+    "testCriteria": null,
+    "outputFormat": null,
+    "otherNotes": null
+  },
+  "dataMineContext": {
+    "remoteUrl": null,
+    "githubToken": null,
+    "maxExamples": 100
+  }
+}

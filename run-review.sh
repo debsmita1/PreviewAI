@@ -14,24 +14,49 @@ spin() {
   tput cnorm
 }
 
-# Usage: ./run-review.sh /path/to/target-repo [staged|commit|<rev>|default:staged] 
-TOOL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TARGET_REPO="${1:-}"
-MODE="${2:-staged}"
+TARGET_REPO=""
+MODE="staged"
+CUSTOM_PROMPT=""
+
+# Parse flags
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)
+      TARGET_REPO="$2"
+      shift 2
+      ;;
+    --mode)
+      MODE="$2"
+      shift 2
+      ;;
+    --prompt)
+      CUSTOM_PROMPT="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Usage: $0 --repo <path> [--mode staged|commit|<rev>] [--prompt <path-to-json>]"
+      exit 1
+      ;;
+  esac
+done
 
 if [ -z "$TARGET_REPO" ]; then
-  echo "Usage: $0 /path/to/target-repo [staged|commit|<rev>|default:staged]"
+  echo "❌ Error: --repo is required"
+  echo "Usage: $0 --repo <path> [--mode staged|commit|<rev>] [--prompt <custom text>]"
   exit 1
 fi
 
 if [ ! -d "$TARGET_REPO" ]; then
-  echo "Target repo not found: $TARGET_REPO"
+  echo "❌ Target repo not found: $TARGET_REPO"
   exit 1
 fi
 
+TOOL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 cd "$TOOL_DIR"
 if [ ! -d "node_modules" ]; then
-  echo "Installing tool dependencies in $TOOL_DIR..."
+  echo "📦 Installing tool dependencies in $TOOL_DIR..."
   npm install --no-audit --no-fund --silent
 fi
 
@@ -40,15 +65,10 @@ echo "📦 Installing required dependencies..."
 
 # Capture diff from target repo
 cd "$TARGET_REPO"
-# Default to "staged" if MODE is empty or unset
-if [ -z "${MODE:-}" ]; then
-  MODE="staged"
-fi
 
 if [ "$MODE" = "staged" ]; then
   if git diff --cached --quiet; then
-    # no staged changes, fallback to last commit
-    echo "No staged changes found. Using last commit diff."
+    echo "⚠️  No staged changes found. Falling back to last commit."
     DIFF=$(git show --pretty=medium --unified=0 HEAD)
   else
     echo "Using staged changes for review."
@@ -58,23 +78,25 @@ elif [ "$MODE" = "commit" ]; then
   echo "Using last commit diff."
   DIFF=$(git show --pretty=medium --unified=0 HEAD)
 else
-  # allow user-specified rev or range
-  echo "Using specified revision or range"
+  echo "Using revision/range: $MODE"
   DIFF=$(git diff --unified=0 "$MODE")
 fi
 
-# Ensure output directory exists in target repo
 REPORT_DIR="$TARGET_REPO/.code-review"
 echo "📂 Creating report directory: $REPORT_DIR"
 mkdir -p "$REPORT_DIR"
 
-echo "🚀 Running Code Pre-Review Assistant on repo: $TARGET_REPO "
-(echo "$DIFF" | ts-node "$TOOL_DIR/src/ai-code-review.ts" "$TARGET_REPO" > "$REPORT_DIR/code-review.md"
-) & REVIEW_PID=$!
+echo "🚀 Running Code Pre-Review Assistant on repo: $TARGET_REPO"
+
+# Pass prompt only if provided
+CMD="ts-node \"$TOOL_DIR/src/ai-code-review.ts\" \"$TARGET_REPO\""
+if [ -n "$CUSTOM_PROMPT" ]; then
+  CMD="$CMD --prompt \"$CUSTOM_PROMPT\""
+fi
+
+(echo "$DIFF" | eval $CMD > "$REPORT_DIR/code-review.md") & REVIEW_PID=$!
 spin $REVIEW_PID
 wait $REVIEW_PID
+
 echo "✅ Code review generated: $REPORT_DIR/code-review.md"
-echo "Open in VS Code and press Cmd+Shift+V (Ctrl+Shift+V) to preview."
-
-
-# npm run review -- /Users/dsantra/Documents/community-plugins
+echo "👉 Open in VS Code with Cmd+Shift+V (Ctrl+Shift+V on Windows/Linux) to preview."

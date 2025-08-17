@@ -4,22 +4,24 @@ import { getAISuggestions } from "./getAISuggestions";
 import { writeMarkdown } from "./writeMarkdownFile";
 import { ensureOllamaRunning } from "./checkOllama";
 import { getSanitizedDiff } from "./getSanitizedDiff";
+import { CustomPromptType } from "../types";
 
-export async function runE2ECodeReview(repoPath: string, gitDiff: string) {
+export async function runE2ECodeReview(
+  repoPath: string,
+  gitDiff: string,
+  customPrompt?: CustomPromptType
+) {
   let sanitizedDiff = getSanitizedDiff(gitDiff);
-
-  // let auditReport = runNpmAudit(repoPath);
 
   const coveragePath = join(repoPath, ".code-review", "coverage-summary.json");
   let coverageSummary = {};
   if (existsSync(coveragePath)) {
     coverageSummary = JSON.parse(readFileSync(coveragePath, "utf8"));
   }
-  // AI Reviewer
-  ensureOllamaRunning("llama3:latest");
-  let aiSuggestions = await getAISuggestions(sanitizedDiff);
 
-  // Output
+  ensureOllamaRunning("llama3:latest");
+  let aiSuggestions = await getAISuggestions(sanitizedDiff, customPrompt);
+
   let reviewMD = `
 # Code Review Report
 
@@ -28,7 +30,7 @@ export async function runE2ECodeReview(repoPath: string, gitDiff: string) {
 ${sanitizedDiff}
 \`\`\`
 
-## AI Suggestions
+## PreviewAI Suggestions
 ${aiSuggestions}
 
 `;

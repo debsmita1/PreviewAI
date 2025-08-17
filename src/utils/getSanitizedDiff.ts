@@ -20,6 +20,7 @@ function removeLargeBlobs(diff: string): string {
   );
 }
 
+// revisit the logic
 function removeYarnLockDiff(diff: string): string {
   return diff.replace(
     /^diff --git a\/[^\n]*yarn\.lock[^\n]*\n(?:.*\n)*?(?=^diff --git |\Z)/gm,
